@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Sensor Monitoring - CO, CH4, NH3</title>
+  <title>Sensor Monitoring - CO, CH4, NH3, MQ2, MQ135</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     :root {
@@ -112,6 +112,14 @@
         <h2>NH3</h2>
         <p id="nh3-value">Loading...</p>
       </div>
+      <div class="sensor-box">
+        <h2>Raw MQ2</h2>
+        <p id="raw-mq2-value">Loading...</p>
+      </div>
+      <div class="sensor-box">
+        <h2>Raw MQ135</h2>
+        <p id="raw-mq135-value">Loading...</p>
+      </div>
     </div>
 
     <div class="chart-container">
@@ -131,6 +139,8 @@
     const coValue = document.getElementById('co-value');
     const ch4Value = document.getElementById('ch4-value');
     const nh3Value = document.getElementById('nh3-value');
+    const rawMQ2Value = document.getElementById('raw-mq2-value');
+    const rawMQ135Value = document.getElementById('raw-mq135-value');
 
     let chart;
 
@@ -142,11 +152,15 @@
       const coData = feeds.map(feed => parseFloat(feed.field1));
       const ch4Data = feeds.map(feed => parseFloat(feed.field2));
       const nh3Data = feeds.map(feed => parseFloat(feed.field3));
+      const rawMQ2Data = feeds.map(feed => parseInt(feed.field4));
+      const rawMQ135Data = feeds.map(feed => parseInt(feed.field5));
       const labels = feeds.map(feed => new Date(feed.created_at).toLocaleTimeString());
 
       coValue.textContent = coData[coData.length - 1];
       ch4Value.textContent = ch4Data[ch4Data.length - 1];
       nh3Value.textContent = nh3Data[nh3Data.length - 1];
+      rawMQ2Value.textContent = rawMQ2Data[rawMQ2Data.length - 1];
+      rawMQ135Value.textContent = rawMQ135Data[rawMQ135Data.length - 1];
 
       if (chart) chart.destroy();
 
