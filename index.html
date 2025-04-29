@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sensor Monitoring - CO, CH4, NH3</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --primary-color: #2b7a78;
+      --secondary-color: #def2f1;
+      --accent-color: #3aafa9;
+      --text-color: #17252a;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: var(--secondary-color);
+      color: var(--text-color);
+      margin: 0;
+    }
+
+    header {
+      background-color: var(--primary-color);
+      color: white;
+      padding: 1rem 2rem;
+      text-align: center;
+    }
+
+    footer {
+      background-color: var(--primary-color);
+      color: white;
+      text-align: center;
+      padding: 1rem;
+      margin-top: 2rem;
+    }
+
+    main {
+      padding: 2rem;
+    }
+
+    h1 {
+      text-align: center;
+      color: var(--primary-color);
+    }
+
+    .sensor-values {
+      display: flex;
+      justify-content: space-around;
+      flex-wrap: wrap;
+      gap: 1.5rem;
+      margin: 2rem 0;
+    }
+
+    .sensor-box {
+      background-color: white;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      border-radius: 12px;
+      padding: 1.5rem;
+      flex: 1 1 200px;
+      text-align: center;
+      transition: transform 0.3s ease;
+    }
+
+    .sensor-box:hover {
+      transform: translateY(-5px);
+    }
+
+    .sensor-box h2 {
+      margin-bottom: 1rem;
+      color: var(--accent-color);
+    }
+
+    .sensor-box p {
+      font-size: 2rem;
+      font-weight: bold;
+    }
+
+    .chart-container {
+      width: 90%;
+      margin: 0 auto;
+      background-color: white;
+      border-radius: 12px;
+      padding: 1rem;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      height: 400px;
+    }
+
+    canvas {
+      width: 100% !important;
+      height: 100% !important;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h2>Dashboard Monitoring Gas Berbahaya</h2>
+  </header>
+
+  <main>
+    <h1>Monitoring Sensor Gas: CO, CH4, NH3</h1>
+    <div class="sensor-values">
+      <div class="sensor-box">
+        <h2>CO</h2>
+        <p id="co-value">Loading...</p>
+      </div>
+      <div class="sensor-box">
+        <h2>CH4</h2>
+        <p id="ch4-value">Loading...</p>
+      </div>
+      <div class="sensor-box">
+        <h2>NH3</h2>
+        <p id="nh3-value">Loading...</p>
+      </div>
+    </div>
+
+    <div class="chart-container">
+      <canvas id="sensorChart"></canvas>
+    </div>
+  </main>
+
+  <footer>
+    <p>&copy; 2025 Monitoring Gas System. All rights reserved.</p>
+  </footer>
+
+  <script>
+    const channelID = "2888969";
+    const readAPIKey = "CK6F4GGCY9PQ9SW0";
+    const url = `https://api.thingspeak.com/channels/${channelID}/feeds.json?api_key=${readAPIKey}&results=10`;
+
+    const coValue = document.getElementById('co-value');
+    const ch4Value = document.getElementById('ch4-value');
+    const nh3Value = document.getElementById('nh3-value');
+
+    let chart;
+
+    async function fetchData() {
+      const res = await fetch(url);
+      const data = await res.json();
+      const feeds = data.feeds;
+
+      const coData = feeds.map(feed => parseFloat(feed.field1));
+      const ch4Data = feeds.map(feed => parseFloat(feed.field2));
+      const nh3Data = feeds.map(feed => parseFloat(feed.field3));
+      const labels = feeds.map(feed => new Date(feed.created_at).toLocaleTimeString());
+
+      coValue.textContent = coData[coData.length - 1];
+      ch4Value.textContent = ch4Data[ch4Data.length - 1];
+      nh3Value.textContent = nh3Data[nh3Data.length - 1];
+
+      if (chart) chart.destroy();
+
+      chart = new Chart(document.getElementById('sensorChart'), {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: 'CO',
+              data: coData,
+              borderColor: 'rgba(255, 99, 132, 1)',
+              backgroundColor: 'rgba(255, 99, 132, 0.2)',
+              fill: true,
+              tension: 0.4,
+              pointRadius: 3,
+              pointBackgroundColor: 'rgba(255, 99, 132, 1)',
+            },
+            {
+              label: 'CH4',
+              data: ch4Data,
+              borderColor: 'rgba(54, 162, 235, 1)',
+              backgroundColor: 'rgba(54, 162, 235, 0.2)',
+              fill: true,
+              tension: 0.4,
+              pointRadius: 3,
+              pointBackgroundColor: 'rgba(54, 162, 235, 1)',
+            },
+            {
+              label: 'NH3',
+              data: nh3Data,
+              borderColor: 'rgba(75, 192, 192, 1)',
+              backgroundColor: 'rgba(75, 192, 192, 0.2)',
+              fill: true,
+              tension: 0.4,
+              pointRadius: 3,
+              pointBackgroundColor: 'rgba(75, 192, 192, 1)',
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          devicePixelRatio: 2,
+          plugins: {
+            legend: {
+              position: 'top',
+              labels: {
+                font: { size: 14 }
+              }
+            },
+            title: {
+              display: true,
+              text: 'Grafik Monitoring Gas CO, CH4, NH3',
+              font: { size: 18 }
+            },
+            tooltip: {
+              mode: 'index',
+              intersect: false,
+            }
+          },
+          interaction: {
+            mode: 'nearest',
+            axis: 'x',
+            intersect: false
+          },
+          scales: {
+            x: {
+              grid: {
+                color: 'rgba(0, 0, 0, 0.05)'
+              },
+              ticks: {
+                font: { size: 12 }
+              }
+            },
+            y: {
+              beginAtZero: true,
+              grid: {
+                color: 'rgba(0, 0, 0, 0.05)'
+              },
+              ticks: {
+                font: { size: 12 }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    setInterval(fetchData, 15000); // update every 15 seconds
+    fetchData(); // initial load
+  </script>
+</body>
+</html>
