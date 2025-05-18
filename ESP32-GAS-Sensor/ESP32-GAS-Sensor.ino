@@ -1,18 +1,21 @@
-#include <Wire.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
-#include <WiFi.h>
-#include <HTTPClient.h>
+#include <Wire.h>                    // Untuk komunikasi I2C
+#include <Adafruit_GFX.h>            // Library grafis untuk OLED
+#include <Adafruit_SSD1306.h>        // Library khusus untuk OLED SSD1306
+#include <WiFi.h>                    // Untuk koneksi WiFi ESP32
+#include <HTTPClient.h>              // Untuk komunikasi HTTP (kirim ke ThingSpeak)
 
+// Konfigurasi ukuran layar OLED
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
+// Nilai resistansi beban dan resistansi sensor di udara bersih
 #define RL 10
-#define Ro_CO 2.4
-#define Ro_CH4 2.6
-#define Ro_NH3 1.88
+#define Ro_CO 2.4       // Nilai resistansi sensor MQ2 untuk gas CO di udara bersih
+#define Ro_CH4 2.6      // Nilai resistansi sensor MQ2 untuk gas CH4 (metana)
+#define Ro_NH3 1.88     // Nilai resistansi sensor MQ135 untuk gas NH3 (amonia)
 
+// Konstanta regresi dari datasheet sensor gas
 #define aco -0.301
 #define bco 1.079
 #define ach4 -0.398
@@ -20,35 +23,41 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 #define m -0.417
 #define b 0.843
 
+// Variabel untuk menyimpan nilai perhitungan sensor
 float VRL, Rs, ratio;
 float co, ch4, nh3;
 int raw_mq2, raw_mq135;
-#define buzzer 19
 
+#define buzzer 19                    // Pin buzzer sebagai alarm
+
+// Pin sensor gas analog
 const int MQ2_sensor = 34;
 const int MQ135_sensor = 32;
-const int numReadings = 10;
+const int numReadings = 10;         // Jumlah pengambilan sampel untuk perataan nilai
 
-const char* ssid = "sigid";
+// Konfigurasi WiFi dan server ThingSpeak
+const char* ssid = "sigid";         
 const char* password = "12345678";
-const char* apiKey = "KGADI7AJD27XWE35";
+const char* apiKey = "KGADI7AJD27XWE35"; // API Key dari ThingSpeak
 const char* server = "api.thingspeak.com";
 
+// Variabel interval pengiriman dan pembacaan sensor
 unsigned long previousMillis = 0;
-const long sendInterval = 120000;
+const long sendInterval = 120000; // 2 menit
 unsigned long lastReadTime = 0;
-const long readInterval = 1000;
+const long readInterval = 1000;   // 1 detik
 
-String lastSendTimeFormatted = "00:00:00";
+String lastSendTimeFormatted = "00:00:00"; // Menyimpan waktu terakhir pengiriman data
 
 void setup() {
   Serial.begin(115200);
   pinMode(MQ2_sensor, INPUT);
   pinMode(MQ135_sensor, INPUT);
   pinMode(buzzer, OUTPUT);
+
+  // Inisialisasi OLED
   display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
   display.clearDisplay();
-
   display.setTextSize(2);
   display.setTextColor(SSD1306_WHITE);
   display.setCursor(0, 20);
@@ -57,6 +66,7 @@ void setup() {
   delay(2000);
   display.clearDisplay();
 
+  // Koneksi WiFi
   WiFi.begin(ssid, password);
   Serial.print("Connecting to WiFi");
   while (WiFi.status() != WL_CONNECTED) {
@@ -74,19 +84,21 @@ void setup() {
 void loop() {
   unsigned long currentMillis = millis();
 
+  // Baca sensor setiap 1 detik
   if (currentMillis - lastReadTime >= readInterval) {
     lastReadTime = currentMillis;
-    readAndCalculateMQ2();
-    readAndCalculateMQ135();
-    displayValues();
+    readAndCalculateMQ2();       // Baca MQ2 dan hitung CO, CH4
+    readAndCalculateMQ135();     // Baca MQ135 dan hitung NH3
+    displayValues();             // Tampilkan data di OLED
   }
 
+  // Kirim data ke ThingSpeak setiap 2 menit
   if (currentMillis - previousMillis >= sendInterval) {
     previousMillis = currentMillis;
     sendDataToThingSpeak(co, ch4, nh3, raw_mq2, raw_mq135);
   }
-  
-  // Kondisi untuk menyalakan buzzer
+
+  // Nyalakan buzzer jika konsentrasi gas berbahaya
   if (ch4 > 10 || co > 10 || nh3 > 3) {
     digitalWrite(buzzer, HIGH);
   } else {
@@ -94,6 +106,7 @@ void loop() {
   }
 }
 
+// Fungsi untuk mengirim data ke ThingSpeak via HTTP GET
 void sendDataToThingSpeak(float co, float ch4, float nh3, int raw_mq2, int raw_mq135) {
   if (WiFi.status() == WL_CONNECTED) {
     HTTPClient http;
@@ -112,6 +125,7 @@ void sendDataToThingSpeak(float co, float ch4, float nh3, int raw_mq2, int raw_m
       Serial.println(httpResponseCode);
       Serial.println(payload);
 
+      // Format jam pengiriman terakhir
       unsigned long t = millis() / 1000;
       int hours = t / 3600;
       int minutes = (t % 3600) / 60;
@@ -145,6 +159,7 @@ void sendDataToThingSpeak(float co, float ch4, float nh3, int raw_mq2, int raw_m
   }
 }
 
+// Menampilkan hasil sensor ke layar OLED
 void displayValues() {
   display.clearDisplay();
   display.setCursor(0, 0);
@@ -159,6 +174,7 @@ void displayValues() {
   display.display();
 }
 
+// Fungsi untuk membaca dan menghitung gas dari sensor MQ2
 void readAndCalculateMQ2() {
   int totalValue = 0;
   for (int i = 0; i < numReadings; i++) {
@@ -169,11 +185,12 @@ void readAndCalculateMQ2() {
   Serial.print("MQ2 Raw Value: ");
   Serial.println(raw_mq2);
 
-  VRL = raw_mq2 * (3.3 / 4095.0);
+  VRL = raw_mq2 * (3.3 / 4095.0);         // Konversi ADC ke voltase
   if (VRL > 0) {
-    Rs = ((3.3 * RL) / VRL) - RL;
-    float ratio_co = Rs / Ro_CO;
-    float ratio_ch4 = Rs / Ro_CH4;
+    Rs = ((3.3 * RL) / VRL) - RL;         // Hitung resistansi sensor
+
+    float ratio_co = Rs / Ro_CO;         // Rasio untuk gas CO
+    float ratio_ch4 = Rs / Ro_CH4;       // Rasio untuk gas CH4
 
     co = (ratio_co > 0) ? pow(10, (log10(ratio_co) - bco) / aco) : 0;
     ch4 = (ratio_ch4 > 0) ? pow(10, (log10(ratio_ch4) - bch4) / ach4) : 0;
@@ -182,13 +199,15 @@ void readAndCalculateMQ2() {
     ch4 = 0;
   }
 
-    if (co > 10 | ch4 > 10 ){
+  // Kondisi darurat untuk buzzer (opsional, sudah dicek di loop)
+  if (co > 10 || ch4 > 10) {
     digitalWrite(buzzer, HIGH);
-  }else{
+  } else {
     digitalWrite(buzzer, LOW);
   }
 }
 
+// Fungsi untuk membaca dan menghitung gas dari sensor MQ135
 void readAndCalculateMQ135() {
   int totalValue = 0;
   for (int i = 0; i < numReadings; i++) {
@@ -208,9 +227,10 @@ void readAndCalculateMQ135() {
     nh3 = 0;
   }
 
-  if (nh3 > 2){
+  // Kondisi darurat untuk buzzer (opsional)
+  if (nh3 > 2) {
     digitalWrite(buzzer, HIGH);
-  }else{
+  } else {
     digitalWrite(buzzer, LOW);
   }
 }
